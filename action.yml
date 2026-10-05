@@ -1,0 +1,41 @@
+name: 'Run CI check'
+description: >-
+  Runs a command, tees its output to a log file, and records the step's
+  outcome into a shared outcomes.json - the two things the quality-gate
+  action (see gate/action.yml) needs later to build the PR comment. Put
+  continue-on-error: true on the step that uses this action so the job
+  keeps running the rest of its checks after one fails; this action never
+  swallows the failure itself, it just makes sure it's captured first.
+inputs:
+  name:
+    description: >-
+      Step id, e.g. lint, typecheck, test, build. Used as the log file
+      name and the outcomes.json key - must be unique within the job and
+      match what gate/action.yml's STEPS table expects for structured
+      parsing (unrecognized ids still work, just fall back to a plain log
+      tail).
+    required: true
+  run:
+    description: Shell command to run.
+    required: true
+  log-dir:
+    description: Directory to write <name>.log and outcomes.json into.
+    required: false
+    default: ci-results
+runs:
+  using: composite
+  steps:
+    - id: run
+      shell: bash
+      run: |
+        set -o pipefail
+        mkdir -p "${{ inputs.log-dir }}"
+        ${{ inputs.run }} 2>&1 | tee "${{ inputs.log-dir }}/${{ inputs.name }}.log"
+    - shell: bash
+      if: always()
+      run: |
+        mkdir -p "${{ inputs.log-dir }}"
+        file="${{ inputs.log-dir }}/outcomes.json"
+        [ -f "$file" ] || echo '{}' > "$file"
+        tmp="$(mktemp)"
+        jq --arg k "${{ inputs.name }}" --arg v "${{ steps.run.outcome }}" '.[$k] = $v' "$file" > "$tmp" && mv "$tmp" "$file"

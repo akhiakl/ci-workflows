@@ -1,0 +1,92 @@
+name: 'Quality gate PR comment'
+description: >-
+  Downloads a repo's ci-results-* (or custom-pattern) artifacts, built by
+  the root run-check action, and posts/updates one sticky PR comment with
+  a status table and a structured failure breakdown.
+inputs:
+  marker:
+    description: >-
+      HTML comment used to find this comment on later runs so it's
+      updated in place instead of duplicated. Keep this stable across
+      migrations - the same marker as any comment this replaces means the
+      existing comment thread continues rather than a new one appearing.
+    required: true
+  title:
+    description: Comment heading.
+    required: false
+    default: 'Quality Gate'
+  status:
+    description: >-
+      Newline-separated "Label=result" pairs for the status table, e.g.
+        Lint, Typecheck & Test (Node 22 & 24)=success
+        End-to-End Tests=failure
+      `result` is one of success/failure/skipped/cancelled and renders as
+      an icon.
+    required: true
+  artifact-pattern:
+    description: Artifact name prefix to download and scan for failures.
+    required: false
+    default: ci-results-
+  coverage-summary-path:
+    description: >-
+      Local path to an Istanbul coverage-summary.json (download it with
+      your own actions/download-artifact step first, if you have one) to
+      render as a coverage table. Leave empty to skip the section.
+    required: false
+    default: ''
+  github-token:
+    required: false
+    default: ${{ github.token }}
+runs:
+  using: composite
+  steps:
+    - name: Download check results
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      continue-on-error: true # absent when a job failed before it could upload
+      with:
+        pattern: ${{ inputs.artifact-pattern }}*
+        path: ci-results
+
+    - name: Build quality gate comment
+      id: build
+      shell: bash
+      env:
+        TITLE: ${{ inputs.title }}
+        STATUS: ${{ inputs.status }}
+        ARTIFACT_PREFIX: ${{ inputs.artifact-pattern }}
+        COVERAGE_PATH: ${{ inputs.coverage-summary-path }}
+        RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      run: node "${{ github.action_path }}/build-comment.mjs" > quality-gate-comment.md
+
+    - name: Post or update PR comment
+      if: github.event.pull_request.head.repo.full_name == github.repository
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+      env:
+        MARKER: ${{ inputs.marker }}
+      with:
+        github-token: ${{ inputs.github-token }}
+        script: |
+          const fs = require('fs');
+          const marker = process.env.MARKER;
+          const body = `${marker}\n${fs.readFileSync('quality-gate-comment.md', 'utf8')}`;
+          const comments = await github.paginate(github.rest.issues.listComments, {
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+          });
+          const existing = comments.find((c) => c.body?.includes(marker));
+          if (existing) {
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: existing.id,
+              body,
+            });
+          } else {
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            });
+          }
