@@ -1,0 +1,31 @@
+name: 'Install Playwright browsers'
+description: >-
+  Installs the browsers for the repo's own @playwright/test version, with
+  the download cached per version; on a cache hit only the system
+  libraries are installed. Run it after dependencies are installed (for
+  example with ../setup-pnpm).
+inputs:
+  browsers:
+    description: Space-separated browsers to install.
+    required: false
+    default: chromium
+runs:
+  using: composite
+  steps:
+    - id: version
+      shell: bash
+      run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+
+    - id: cache
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-${{ runner.os }}-${{ steps.version.outputs.version }}-${{ inputs.browsers }}
+
+    - if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: npx --no-install playwright install --with-deps ${{ inputs.browsers }}
+
+    - if: steps.cache.outputs.cache-hit == 'true'
+      shell: bash
+      run: npx --no-install playwright install-deps ${{ inputs.browsers }}

@@ -111,10 +111,57 @@ jobs:
         run: exit 1
 ```
 
+## Setup actions
+
+### `akhiakl/ci-workflows/setup-pnpm@v1`
+
+pnpm, Node from `.nvmrc` (pnpm store cached) and `pnpm install
+--frozen-lockfile`, in one step after `actions/checkout`.
+
+```yaml
+steps:
+  - uses: actions/checkout@v4
+  - uses: akhiakl/ci-workflows/setup-pnpm@v1
+    # with:
+    #   node-version-file: .nvmrc   # default
+    #   install: 'false'            # skip the install
+```
+
+### `akhiakl/ci-workflows/playwright-browsers@v1`
+
+Installs browsers for the repo's own `@playwright/test` version, cached
+per version; a cache hit only installs system libraries.
+
+```yaml
+  - uses: akhiakl/ci-workflows/playwright-browsers@v1
+    # with:
+    #   browsers: chromium          # default; e.g. "chromium firefox"
+```
+
+## Reusable workflows
+
+Call these as a whole job with `uses:` (they set their own runner and
+permissions).
+
+| Workflow | Caller trigger | What it does |
+| --- | --- | --- |
+| `conventional-pr-title.yml` | `pull_request_target` (`opened, edited, synchronize`) | Fails PRs whose title isn't a Conventional Commit (`types` input to change the list). |
+| `release-please.yml` | `push` to `main` | Rolling release PR; merging it tags and publishes a GitHub Release. Pass `secrets: inherit` with a `RELEASE_PLEASE_TOKEN` PAT so CI runs on the release PR. |
+| `deploy-hook.yml` | `release: published` | POSTs to `DEPLOY_HOOK_URL` so production only ships from releases; no secret, no deploy. |
+
+```yaml
+jobs:
+  title:
+    uses: akhiakl/ci-workflows/.github/workflows/conventional-pr-title.yml@v1
+```
+
 ## Layout
 
 ```
 action.yml                 # run-check composite action
+setup-pnpm/action.yml      # pnpm + Node + frozen install
+playwright-browsers/action.yml  # cached Playwright browsers
+.github/workflows/         # reusable: conventional-pr-title, release-please, deploy-hook
 gate/
   action.yml                # quality-gate composite action
   build-comment.mjs          # assembles the comment body from gate/action.yml's inputs
