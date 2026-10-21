@@ -1,0 +1,31 @@
+# Reusable: call a hosting provider's deploy hook (Vercel, Netlify, ...).
+# Meant for `on: release: types: [published]`, so production only ships
+# from tagged releases. Without the secret it logs and exits cleanly.
+#
+# Caller:
+#   jobs:
+#     production:
+#       uses: akhiakl/ci-workflows/.github/workflows/deploy-hook.yml@v1
+#       secrets: inherit
+name: Deploy
+
+on:
+  workflow_call:
+    secrets:
+      DEPLOY_HOOK_URL:
+        required: false
+
+jobs:
+  deploy:
+    name: Trigger deploy hook
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          HOOK: ${{ secrets.DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$HOOK" ]; then
+            echo "DEPLOY_HOOK_URL not set: release tagged, no deploy triggered."
+            exit 0
+          fi
+          curl -fsS -X POST "$HOOK"
+          echo "Deploy triggered for ${GITHUB_REF_NAME}."

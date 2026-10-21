@@ -1,0 +1,25 @@
+name: 'Set up pnpm project'
+description: >-
+  pnpm + Node (version from a file such as .nvmrc, with the pnpm store
+  cached) and a frozen-lockfile install: the four steps every job in a
+  pnpm repo otherwise repeats. Run it after actions/checkout.
+inputs:
+  node-version-file:
+    description: File holding the Node version (.nvmrc, .node-version, package.json).
+    required: false
+    default: .nvmrc
+  install:
+    description: Set to "false" to skip `pnpm install --frozen-lockfile`.
+    required: false
+    default: 'true'
+runs:
+  using: composite
+  steps:
+    - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+    - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      with:
+        node-version-file: ${{ inputs.node-version-file }}
+        cache: pnpm
+    - if: inputs.install == 'true'
+      shell: bash
+      run: pnpm install --frozen-lockfile
