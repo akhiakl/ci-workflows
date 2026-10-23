@@ -115,6 +115,43 @@ export function parsePlaywright(results) {
   return failures;
 }
 
+/** `prettier --check`: one `[warn] <file>` line per unformatted file,
+ * then a summary line that is not a file. */
+export function parsePrettier(log) {
+  return log
+    .replace(ANSI, "")
+    .split("\n")
+    .map((line) => line.match(/^\[warn\]\s+(.+)$/)?.[1]?.trim())
+    .filter((file) => file && !/^Code style issues/.test(file))
+    .map((file) => `\`${relative(file)}\``);
+}
+
+/** pg_prove (e.g. `supabase test db`): a `<file>.sql ..` line per test
+ * file, then `#   Failed test N: "name"` diagnostics for each failure.
+ * Verbose runs print `not ok N - name` instead; used when there are no
+ * diagnostics so a failure is never counted twice. */
+export function parsePgTap(log) {
+  const diagnostics = [];
+  const notOk = [];
+  let file = "";
+  for (const raw of log.replace(ANSI, "").split("\n")) {
+    const line = raw.trim();
+    const header = line.match(/^(\S+\.sql) \.\./);
+    if (header) {
+      file = relative(header[1]);
+      continue;
+    }
+    const failed = line.match(/^#\s+Failed test (\d+)(?:: "(.*)")?/);
+    if (failed) {
+      diagnostics.push(`\`${file}\` #${failed[1]} ${failed[2] ?? ""}`.trim());
+      continue;
+    }
+    const plain = line.match(/^not ok (\d+)(?: - (.*))?/);
+    if (plain) notOk.push(`\`${file}\` #${plain[1]} ${plain[2] ?? ""}`.trim());
+  }
+  return diagnostics.length > 0 ? diagnostics : notOk;
+}
+
 /** The last lines of a log, for a step whose output has no structure. */
 export function tail(log, lines = 15) {
   return log.replace(ANSI, "").trimEnd().split("\n").slice(-lines).join("\n");
@@ -145,6 +182,13 @@ const plural = (count, word) => `${count} ${word}${count === 1 ? "" : "s"}`;
  * name override or a structured parser. */
 export const STEPS = [
   { step: "install", name: "Install", log: "install.log" },
+  {
+    step: "format",
+    name: "Formatting",
+    log: "format.log",
+    unit: "unformatted file",
+    parse: (dir) => parsePrettier(read(dir, "format.log")),
+  },
   {
     step: "lint",
     name: "Lint",
@@ -181,6 +225,14 @@ export const STEPS = [
   },
   { step: "build", name: "Build", log: "build.log" },
   { step: "migrate", name: "Database migrations", log: "migrate.log" },
+  {
+    step: "db-test",
+    name: "Database tests (pgTAP)",
+    log: "db-test.log",
+    unit: "failed test",
+    parse: (dir) => parsePgTap(read(dir, "db-test.log")),
+  },
+  { step: "db-lint", name: "Database lint", log: "db-lint.log" },
   {
     step: "e2e",
     name: "End-to-end tests",

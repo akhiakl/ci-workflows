@@ -72,8 +72,9 @@ jobs:
 
 Known step `name`s get a nicer label and structured per-tool failure
 parsing in the comment (see `gate/quality-summary.mjs`'s `STEPS` table:
-`install`, `lint`, `codegen`, `typecheck`, `test`, `coverage`, `build`,
-`migrate`, `e2e`). An unlisted name still works, just falls back to a
+`install`, `format` (Prettier), `lint`, `codegen`, `typecheck`, `test`,
+`coverage`, `build`, `migrate`, `db-test` (pgTAP via pg_prove /
+`supabase test db`), `db-lint`, `e2e`). An unlisted name still works, just falls back to a
 plain log tail named after itself.
 
 ### `akhiakl/ci-workflows/gate@v1` — post the PR comment
