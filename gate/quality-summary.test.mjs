@@ -9,7 +9,9 @@ import {
   collectFailures,
   oneLine,
   parseEslint,
+  parsePgTap,
   parsePlaywright,
+  parsePrettier,
   parseTsc,
   parseVitest,
   renderCheck,
@@ -19,6 +21,36 @@ import {
 const ESC = String.fromCharCode(27);
 
 describe("parsers", () => {
+  it("reads files Prettier would reformat, skipping the summary line", () => {
+    const log = [
+      "Checking formatting...",
+      "[warn] apps/mobile/tsconfig.json",
+      `${ESC}[33m[warn]${ESC}[39m src/a.ts`,
+      "[warn] Code style issues found in 2 files. Run Prettier with --write to fix.",
+    ].join("\n");
+    expect(parsePrettier(log)).toEqual(["`apps/mobile/tsconfig.json`", "`src/a.ts`"]);
+  });
+
+  it("reads failed pgTAP tests per file from pg_prove output", () => {
+    const log = [
+      "/repo/supabase/tests/rls_test.sql .. ",
+      "#   Failed test 2: \"every public table has RLS enabled\"",
+      "#     have: recipes",
+      "#     want: empty",
+      "# Looks like you failed 1 test of 3",
+      "/repo/supabase/tests/rls_test.sql .. Failed 1/3 subtests",
+      "/repo/supabase/tests/jobs_test.sql .. ok",
+    ].join("\n");
+    expect(parsePgTap(log)).toEqual([
+      "`/repo/supabase/tests/rls_test.sql` #2 every public table has RLS enabled",
+    ]);
+  });
+
+  it("falls back to verbose `not ok` lines when pg_prove prints no diagnostics", () => {
+    const log = ["supabase/tests/a_test.sql .. ", "not ok 1 - jobs table exists"].join("\n");
+    expect(parsePgTap(log)).toEqual(["`supabase/tests/a_test.sql` #1 jobs table exists"]);
+  });
+
   it("reads ESLint errors per file, skipping warnings", () => {
     const log = [
       "",
