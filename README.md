@@ -86,7 +86,8 @@ builds the failure section, and posts/updates one sticky comment.
 jobs:
   quality-gate:
     needs: [verify, e2e]
-    if: always() && github.event_name == 'pull_request'
+    # !cancelled(): still report failures, but don't overwrite the comment from a superseded run
+    if: ${{ !cancelled() && github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
