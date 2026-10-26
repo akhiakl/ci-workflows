@@ -1,0 +1,54 @@
+# Reusable: build and deploy the released tag to Vercel production with the
+# Vercel CLI. Meant for `on: release: types: [published]`, so production only
+# ships from tagged releases. Without the secret it logs and exits cleanly.
+# Use this instead of a deploy hook when the project's Ignored Build Step
+# skips production builds (Hobby has no way to disable git production deploys).
+#
+# Caller:
+#   jobs:
+#     production:
+#       uses: akhiakl/ci-workflows/.github/workflows/deploy-vercel.yml@v1
+#       with:
+#         org-id: team_xxx
+#         project-id: prj_xxx
+#       secrets: inherit
+name: Deploy
+
+on:
+  workflow_call:
+    inputs:
+      org-id:
+        description: Vercel team or user ID (VERCEL_ORG_ID)
+        required: true
+        type: string
+      project-id:
+        description: Vercel project ID (VERCEL_PROJECT_ID)
+        required: true
+        type: string
+    secrets:
+      VERCEL_TOKEN:
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy to Vercel production
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_ORG_ID: ${{ inputs.org-id }}
+      VERCEL_PROJECT_ID: ${{ inputs.project-id }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+    steps:
+      - name: Skip when VERCEL_TOKEN is unset
+        if: env.VERCEL_TOKEN == ''
+        run: echo "VERCEL_TOKEN not set: release tagged, no deploy."
+      - uses: actions/checkout@v7
+        if: env.VERCEL_TOKEN != ''
+      - name: Build and deploy ${{ github.ref_name }}
+        if: env.VERCEL_TOKEN != ''
+        run: |
+          npx --yes vercel@latest pull --yes --environment=production --token="$VERCEL_TOKEN"
+          npx --yes vercel@latest build --prod --token="$VERCEL_TOKEN"
+          npx --yes vercel@latest deploy --prebuilt --prod --token="$VERCEL_TOKEN"

@@ -149,6 +149,7 @@ permissions).
 | --- | --- | --- |
 | `conventional-pr-title.yml` | `pull_request_target` (`opened, edited, synchronize`) | Fails PRs whose title isn't a Conventional Commit (`types` input to change the list). |
 | `release-please.yml` | `push` to `main` | Rolling release PR; merging it tags and publishes a GitHub Release. Pass `secrets: inherit` with a `RELEASE_PLEASE_TOKEN` PAT so CI runs on the release PR. |
+| `deploy-vercel.yml` | `release: published` | Builds and deploys the tag with the Vercel CLI (inputs `org-id`, `project-id`; secret `VERCEL_TOKEN`); no secret, no deploy. For projects whose Ignored Build Step skips production git builds. |
 | `deploy-hook.yml` | `release: published` | POSTs to `DEPLOY_HOOK_URL` so production only ships from releases; no secret, no deploy. |
 
 ```yaml
@@ -163,7 +164,7 @@ jobs:
 action.yml                 # run-check composite action
 setup-pnpm/action.yml      # pnpm + Node + frozen install
 playwright-browsers/action.yml  # cached Playwright browsers
-.github/workflows/         # reusable: conventional-pr-title, release-please, deploy-hook
+.github/workflows/         # reusable: conventional-pr-title, release-please, deploy-hook, deploy-vercel
 gate/
   action.yml                # quality-gate composite action
   build-comment.mjs          # assembles the comment body from gate/action.yml's inputs
