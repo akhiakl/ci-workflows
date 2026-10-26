@@ -60,6 +60,12 @@ jobs:
         if: env.VERCEL_TOKEN != ''
         with:
           node-version: ${{ inputs.node-version }}
+      # `vercel build` shells out to the project's package manager. Corepack
+      # (bundled with Node) provides pnpm/yarn at the version pinned by the
+      # repo's `packageManager` field; it is a no-op for npm projects.
+      - name: Enable Corepack
+        if: env.VERCEL_TOKEN != ''
+        run: corepack enable
       - name: Build and deploy ${{ github.ref_name }}
         if: env.VERCEL_TOKEN != ''
         env:
