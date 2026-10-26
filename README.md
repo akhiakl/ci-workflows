@@ -163,7 +163,7 @@ permissions).
 | --- | --- | --- |
 | `conventional-pr-title.yml` | `pull_request_target` (`opened, edited, synchronize`) | Fails PRs whose title isn't a Conventional Commit (`types` input to change the list). |
 | `release-please.yml` | `push` to `main` | Rolling release PR; merging it tags and publishes a GitHub Release. Pass `secrets: inherit` with a `RELEASE_PLEASE_TOKEN` PAT so CI runs on the release PR. |
-| `deploy-vercel.yml` | `release: published` | Builds and deploys the tag with the Vercel CLI (inputs `org-id`, `project-id`; secret `VERCEL_TOKEN`); no secret, no deploy. For projects whose Ignored Build Step skips production git builds. |
+| `deploy-vercel.yml` | `release: published` | Builds and deploys the tag with the Vercel CLI (inputs `org-id`, `project-id`, optional `smoke-url` that must answer 200; secret `VERCEL_TOKEN`) and writes a run summary (release, commit, deployment URL, smoke result); no secret, no deploy. For projects whose Ignored Build Step skips production git builds. |
 | `deploy-hook.yml` | `release: published` | POSTs to `DEPLOY_HOOK_URL` so production only ships from releases; no secret, no deploy. |
 
 ```yaml

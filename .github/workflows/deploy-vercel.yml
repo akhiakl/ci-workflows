@@ -11,6 +11,7 @@
 #       with:
 #         org-id: team_xxx
 #         project-id: prj_xxx
+#         smoke-url: https://example.com   # optional post-deploy check
 #       secrets: inherit
 name: Deploy
 
@@ -35,6 +36,11 @@ on:
         required: false
         type: string
         default: "24"
+      smoke-url:
+        description: Production URL that must answer 200 after the deploy (empty skips the check)
+        required: false
+        type: string
+        default: ""
     secrets:
       VERCEL_TOKEN:
         required: false
@@ -67,10 +73,48 @@ jobs:
         if: env.VERCEL_TOKEN != ''
         run: corepack enable
       - name: Build and deploy ${{ github.ref_name }}
+        id: deploy
         if: env.VERCEL_TOKEN != ''
         env:
           VERCEL_CLI: vercel@${{ inputs.vercel-version }}
         run: |
           npx --yes "$VERCEL_CLI" pull --yes --environment=production --token="$VERCEL_TOKEN"
           npx --yes "$VERCEL_CLI" build --prod --token="$VERCEL_TOKEN"
-          npx --yes "$VERCEL_CLI" deploy --prebuilt --prod --token="$VERCEL_TOKEN"
+          url=$(npx --yes "$VERCEL_CLI" deploy --prebuilt --prod --token="$VERCEL_TOKEN")
+          echo "$url"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+      # The CLI returns once the deploy is ready; retries cover alias propagation.
+      - name: Smoke check
+        id: smoke
+        if: env.VERCEL_TOKEN != '' && inputs.smoke-url != ''
+        env:
+          SMOKE_URL: ${{ inputs.smoke-url }}
+        run: |
+          for attempt in 1 2 3 4 5; do
+            code=$(curl -s -o /dev/null -L -w '%{http_code}' --max-time 20 "$SMOKE_URL" || true)
+            echo "attempt $attempt: HTTP $code"
+            [ "$code" = 200 ] && exit 0
+            sleep 6
+          done
+          exit 1
+      - name: Summary
+        if: always() && env.VERCEL_TOKEN != ''
+        env:
+          DEPLOY_URL: ${{ steps.deploy.outputs.url }}
+          DEPLOY_OUTCOME: ${{ steps.deploy.outcome }}
+          SMOKE_URL: ${{ inputs.smoke-url }}
+          SMOKE_OUTCOME: ${{ steps.smoke.outcome }}
+        run: |
+          icon() { case "$1" in success) echo "✅ passed";; failure) echo "❌ failed";; skipped) echo "➖ skipped";; *) echo "⚠️ $1";; esac; }
+          {
+            echo "## Vercel production deploy"
+            echo
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Release | \`${GITHUB_REF_NAME}\` |"
+            echo "| Commit | \`${GITHUB_SHA::7}\` |"
+            echo "| Deploy | $(icon "$DEPLOY_OUTCOME") |"
+            [ -n "$DEPLOY_URL" ] && echo "| Deployment | $DEPLOY_URL |"
+            [ -n "$SMOKE_URL" ] && echo "| Smoke check | $(icon "$SMOKE_OUTCOME") $SMOKE_URL |"
+            true
+          } >> "$GITHUB_STEP_SUMMARY"
