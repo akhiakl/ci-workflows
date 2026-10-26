@@ -1,0 +1,70 @@
+# Reusable: build and deploy the released tag to Vercel production with the
+# Vercel CLI. Meant for `on: release: types: [published]`, so production only
+# ships from tagged releases. Without the secret it logs and exits cleanly.
+# Use this instead of a deploy hook when the project's Ignored Build Step
+# skips production builds (Hobby has no way to disable git production deploys).
+#
+# Caller:
+#   jobs:
+#     production:
+#       uses: akhiakl/ci-workflows/.github/workflows/deploy-vercel.yml@v1
+#       with:
+#         org-id: team_xxx
+#         project-id: prj_xxx
+#       secrets: inherit
+name: Deploy
+
+on:
+  workflow_call:
+    inputs:
+      org-id:
+        description: Vercel team or user ID (VERCEL_ORG_ID)
+        required: true
+        type: string
+      project-id:
+        description: Vercel project ID (VERCEL_PROJECT_ID)
+        required: true
+        type: string
+      vercel-version:
+        description: Vercel CLI version to run (pinned for reproducible deploys)
+        required: false
+        type: string
+        default: "65.2.0"
+      node-version:
+        description: Node.js version used to run the CLI
+        required: false
+        type: string
+        default: "24"
+    secrets:
+      VERCEL_TOKEN:
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy to Vercel production
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_ORG_ID: ${{ inputs.org-id }}
+      VERCEL_PROJECT_ID: ${{ inputs.project-id }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+    steps:
+      - name: Skip when VERCEL_TOKEN is unset
+        if: env.VERCEL_TOKEN == ''
+        run: echo "VERCEL_TOKEN not set, release tagged, no deploy."
+      - uses: actions/checkout@v7
+        if: env.VERCEL_TOKEN != ''
+      - uses: actions/setup-node@v7
+        if: env.VERCEL_TOKEN != ''
+        with:
+          node-version: ${{ inputs.node-version }}
+      - name: Build and deploy ${{ github.ref_name }}
+        if: env.VERCEL_TOKEN != ''
+        env:
+          VERCEL_CLI: vercel@${{ inputs.vercel-version }}
+        run: |
+          npx --yes "$VERCEL_CLI" pull --yes --environment=production --token="$VERCEL_TOKEN"
+          npx --yes "$VERCEL_CLI" build --prod --token="$VERCEL_TOKEN"
+          npx --yes "$VERCEL_CLI" deploy --prebuilt --prod --token="$VERCEL_TOKEN"
