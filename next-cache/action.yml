@@ -1,0 +1,20 @@
+name: 'Cache Next.js build'
+description: >-
+  Restores and saves .next/cache (SWC and webpack output) so `next build`
+  only recompiles what changed. Keyed on the lockfile and source files;
+  falls back to the newest cache for the same lockfile. Run it before the
+  build step, after dependencies are installed.
+inputs:
+  path:
+    description: Next.js cache directory.
+    required: false
+    default: .next/cache
+runs:
+  using: composite
+  steps:
+    - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ inputs.path }}
+        key: nextjs-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml', '**/package-lock.json', '**/yarn.lock') }}-${{ hashFiles('**/*.js', '**/*.jsx', '**/*.ts', '**/*.tsx', '!**/node_modules/**', '!.next/**') }}
+        restore-keys: |
+          nextjs-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml', '**/package-lock.json', '**/yarn.lock') }}-

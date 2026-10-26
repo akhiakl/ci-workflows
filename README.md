@@ -138,6 +138,20 @@ per version; a cache hit only installs system libraries.
   - uses: akhiakl/ci-workflows/playwright-browsers@v1
     # with:
     #   browsers: chromium          # default; e.g. "chromium firefox"
+    #   with-deps: 'false'          # skip the slow apt-get of OS libraries
+```
+
+### `akhiakl/ci-workflows/next-cache@v1`
+
+Caches `.next/cache` so `next build` only recompiles what changed. Keyed on
+the lockfile and source files, with a lockfile-only fallback. Put it before
+the build step.
+
+```yaml
+  - uses: akhiakl/ci-workflows/next-cache@v1
+  - run: pnpm build
+    # with:
+    #   path: .next/cache           # default
 ```
 
 ## Reusable workflows
@@ -164,6 +178,7 @@ jobs:
 action.yml                 # run-check composite action
 setup-pnpm/action.yml      # pnpm + Node + frozen install
 playwright-browsers/action.yml  # cached Playwright browsers
+next-cache/action.yml      # cached .next/cache
 .github/workflows/         # reusable: conventional-pr-title, release-please, deploy-hook, deploy-vercel
 gate/
   action.yml                # quality-gate composite action
