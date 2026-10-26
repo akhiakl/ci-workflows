@@ -25,6 +25,16 @@ on:
         description: Vercel project ID (VERCEL_PROJECT_ID)
         required: true
         type: string
+      vercel-version:
+        description: Vercel CLI version to run (pinned for reproducible deploys)
+        required: false
+        type: string
+        default: "65.2.0"
+      node-version:
+        description: Node.js version used to run the CLI
+        required: false
+        type: string
+        default: "24"
     secrets:
       VERCEL_TOKEN:
         required: false
@@ -43,12 +53,18 @@ jobs:
     steps:
       - name: Skip when VERCEL_TOKEN is unset
         if: env.VERCEL_TOKEN == ''
-        run: echo "VERCEL_TOKEN not set: release tagged, no deploy."
+        run: echo "VERCEL_TOKEN not set, release tagged, no deploy."
       - uses: actions/checkout@v7
         if: env.VERCEL_TOKEN != ''
+      - uses: actions/setup-node@v6
+        if: env.VERCEL_TOKEN != ''
+        with:
+          node-version: ${{ inputs.node-version }}
       - name: Build and deploy ${{ github.ref_name }}
         if: env.VERCEL_TOKEN != ''
+        env:
+          VERCEL_CLI: vercel@${{ inputs.vercel-version }}
         run: |
-          npx --yes vercel@latest pull --yes --environment=production --token="$VERCEL_TOKEN"
-          npx --yes vercel@latest build --prod --token="$VERCEL_TOKEN"
-          npx --yes vercel@latest deploy --prebuilt --prod --token="$VERCEL_TOKEN"
+          npx --yes "$VERCEL_CLI" pull --yes --environment=production --token="$VERCEL_TOKEN"
+          npx --yes "$VERCEL_CLI" build --prod --token="$VERCEL_TOKEN"
+          npx --yes "$VERCEL_CLI" deploy --prebuilt --prod --token="$VERCEL_TOKEN"
