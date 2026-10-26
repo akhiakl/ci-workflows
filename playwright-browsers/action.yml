@@ -9,6 +9,13 @@ inputs:
     description: Space-separated browsers to install.
     required: false
     default: chromium
+  with-deps:
+    description: >-
+      Install the OS libraries the browsers need (an apt-get, slow). Set to
+      "false" on runners that already have them, such as ubuntu-latest for
+      chromium.
+    required: false
+    default: 'true'
 runs:
   using: composite
   steps:
@@ -22,10 +29,14 @@ runs:
         path: ~/.cache/ms-playwright
         key: playwright-${{ runner.os }}-${{ steps.version.outputs.version }}-${{ inputs.browsers }}
 
-    - if: steps.cache.outputs.cache-hit != 'true'
+    - if: steps.cache.outputs.cache-hit != 'true' && inputs.with-deps == 'true'
       shell: bash
       run: npx --no-install playwright install --with-deps ${{ inputs.browsers }}
 
-    - if: steps.cache.outputs.cache-hit == 'true'
+    - if: steps.cache.outputs.cache-hit != 'true' && inputs.with-deps != 'true'
+      shell: bash
+      run: npx --no-install playwright install ${{ inputs.browsers }}
+
+    - if: steps.cache.outputs.cache-hit == 'true' && inputs.with-deps == 'true'
       shell: bash
       run: npx --no-install playwright install-deps ${{ inputs.browsers }}
